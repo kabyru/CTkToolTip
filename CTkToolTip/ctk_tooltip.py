@@ -8,7 +8,6 @@ import sys
 import customtkinter
 from tkinter import Toplevel, Frame
 
-
 class CTkToolTip(Toplevel):
     """
     Creates a ToolTip (pop-up) widget for customtkinter.
@@ -28,6 +27,7 @@ class CTkToolTip(Toplevel):
             border_color: str = None,
             alpha: float = 0.95,
             padding: tuple = (10, 2),
+            always_on_top: bool = False,
             **message_kwargs):
 
         super().__init__()
@@ -57,6 +57,9 @@ class CTkToolTip(Toplevel):
 
         # Make the background transparent
         self.config(background=self.transparent_color)
+
+        if always_on_top:
+            self.attributes("-topmost", True)
 
         # StringVar instance for msg string
         self.messageVar = customtkinter.StringVar()
