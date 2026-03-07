@@ -42,8 +42,14 @@ class CTkToolTip(Toplevel):
         self.overrideredirect(True)
 
         if sys.platform.startswith("win"):
-            self.transparent_color = self.widget._apply_appearance_mode(
-                customtkinter.ThemeManager.theme["CTkToplevel"]["fg_color"])
+            if hasattr(self.widget, "_apply_appearance_mode"):
+                color = self.widget._apply_appearance_mode(customtkinter.ThemeManager.theme["CTkToplevel"]["fg_color"])
+            else:
+                color = customtkinter.ThemeManager.theme["CTkToplevel"]["fg_color"]
+            # Ensure color is a string, not a tuple
+            if isinstance(color, (tuple, list)):
+                color = color[0]
+            self.transparent_color = color
             self.attributes("-transparentcolor", self.transparent_color)
             self.transient()
         elif sys.platform.startswith("darwin"):
@@ -58,7 +64,9 @@ class CTkToolTip(Toplevel):
         self.resizable(width=True, height=True)
 
         # Make the background transparent
-        self.config(background=self.transparent_color)
+        # Ensure background color is a string, not a tuple
+        bg_for_config = self.transparent_color[0] if isinstance(self.transparent_color, (tuple, list)) else self.transparent_color
+        self.config(background=bg_for_config)
 
         if always_on_top:
             self.attributes("-topmost", True)
@@ -87,7 +95,14 @@ class CTkToolTip(Toplevel):
         self.attributes('-alpha', self.alpha)
 
         if sys.platform.startswith("win"):
-            if self.widget._apply_appearance_mode(self.bg_color) == self.transparent_color:
+            if hasattr(self.widget, "_apply_appearance_mode"):
+                bg_color_mode = self.widget._apply_appearance_mode(self.bg_color)
+            else:
+                bg_color_mode = self.bg_color
+            # Ensure bg_color_mode is a string, not a tuple
+            if isinstance(bg_color_mode, (tuple, list)):
+                bg_color_mode = bg_color_mode[0]
+            if bg_color_mode == self.transparent_color:
                 self.transparent_color = "#000001"
                 self.config(background=self.transparent_color)
                 self.attributes("-transparentcolor", self.transparent_color)
@@ -106,13 +121,30 @@ class CTkToolTip(Toplevel):
         self.message_label.pack(fill="both", padx=self.padding[0] + self.border_width,
                                 pady=self.padding[1] + self.border_width, expand=True)
 
-        if self.widget.winfo_name() != "tk":
-            if self.frame.cget("fg_color") == self.widget.cget("bg_color"):
-                if not bg_color:
-                    self._top_fg_color = self.frame._apply_appearance_mode(
-                        customtkinter.ThemeManager.theme["CTkFrame"]["top_fg_color"])
-                    if self._top_fg_color != self.transparent_color:
-                        self.frame.configure(fg_color=self._top_fg_color)
+        # Try to compare frame fg_color with widget background color, fallback safely
+        widget_bg = None
+        try:
+            if hasattr(self.widget, 'cget'):
+                # Try 'bg_color' first (for CTk widgets), then 'bg', then 'background'
+                for key in ("bg_color", "bg", "background"):
+                    try:
+                        widget_bg = self.widget.cget(key)
+                        if widget_bg is not None:
+                            break
+                    except Exception:
+                        continue
+        except Exception:
+            pass
+        try:
+            frame_fg = self.frame.cget("fg_color")
+        except Exception:
+            frame_fg = None
+        if frame_fg is not None and widget_bg is not None and frame_fg == widget_bg:
+            if not bg_color:
+                self._top_fg_color = self.frame._apply_appearance_mode(
+                    customtkinter.ThemeManager.theme["CTkFrame"]["top_fg_color"])
+                if self._top_fg_color != self.transparent_color:
+                    self.frame.configure(fg_color=self._top_fg_color)
 
         # Add bindings to the widget without overriding the existing ones
         self.widget.bind("<Enter>", self.on_enter, add="+")
@@ -141,7 +173,6 @@ class CTkToolTip(Toplevel):
             self.status = "inside"
 
         # If the follow flag is not set, motion within the widget will NOT make the ToolTip disappear
-        # Only update position if follow is True or tooltip is not yet visible
         if not self.follow:
             if self.status == "visible":
                 # Tooltip is already visible and follow is False, don't hide it
