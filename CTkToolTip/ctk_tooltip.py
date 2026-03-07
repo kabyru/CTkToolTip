@@ -1,12 +1,14 @@
 """
 CTkToolTip Widget
-version: 0.8
+version: 0.9
 """
 
 import time
 import sys
 import customtkinter
 from tkinter import Toplevel, Frame
+from typing import Optional, Union, Tuple
+
 
 class CTkToolTip(Toplevel):
     """
@@ -21,10 +23,10 @@ class CTkToolTip(Toplevel):
             follow: bool = True,
             x_offset: int = +20,
             y_offset: int = +10,
-            bg_color: str = None,
+            bg_color: Optional[Union[str, Tuple[str, str]]] = None,
             corner_radius: int = 10,
             border_width: int = 0,
-            border_color: str = None,
+            border_color: Optional[Union[str, Tuple[str, str]]] = None,
             alpha: float = 0.95,
             padding: tuple = (10, 2),
             always_on_top: bool = False,
@@ -60,6 +62,7 @@ class CTkToolTip(Toplevel):
 
         if always_on_top:
             self.attributes("-topmost", True)
+
 
         # StringVar instance for msg string
         self.messageVar = customtkinter.StringVar()
@@ -137,10 +140,15 @@ class CTkToolTip(Toplevel):
         if self.status == "outside":
             self.status = "inside"
 
-        # If the follow flag is not set, motion within the widget will make the ToolTip dissapear
+        # If the follow flag is not set, motion within the widget will NOT make the ToolTip disappear
+        # Only update position if follow is True or tooltip is not yet visible
         if not self.follow:
-            self.status = "inside"
-            self.withdraw()
+            if self.status == "visible":
+                # Tooltip is already visible and follow is False, don't hide it
+                return
+            else:
+                # Tooltip not yet visible, set status to inside
+                self.status = "inside"
 
         # Calculate available space on the right side of the widget relative to the screen
         root_width = self.winfo_screenwidth()
@@ -213,3 +221,20 @@ class CTkToolTip(Toplevel):
 
         self.messageVar.set(message)
         self.message_label.configure(**kwargs)
+
+    def destroy(self) -> None:
+        """
+        Destroy the tooltip and clean up bindings.
+        """
+        try:
+            # Unbind all events from the widget
+            self.widget.unbind("<Enter>")
+            self.widget.unbind("<Leave>")
+            self.widget.unbind("<Motion>")
+            self.widget.unbind("<B1-Motion>")
+            self.widget.unbind("<Destroy>")
+        except Exception:
+            pass
+        
+        # Call the parent destroy method
+        super().destroy()
